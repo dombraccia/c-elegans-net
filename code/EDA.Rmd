@@ -1,0 +1,70 @@
+---
+title: "EDA of C. elegans dataset"
+author: "Domenick Braccia"
+date: "2/26/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Overview
+
+This document will serve as an exploratory data analysis of data from [this publication by Asija Diag *et al.*](https://reader.elsevier.com/reader/sd/pii/S1534580718308268?token=C7D789FFC6D26DC7652D5997E740707F4E5B2557DBAB98F15F135DE844C44D3C954F2F04FBEAEF8802A897FE254EF13A)
+
+## Loading & munching data
+
+Overview of the data present in each .xlsx file:
+
+- S1 : Hermaphrodite expression levels (gonads #1 & #2)
+- S2 : Hermaphrodite expression levels (normalized and averaged accross replicates - see M&M)
+- S3 : Hermaphrodite dynamic transcript groups
+- S4 : Hermaphrodite dynamic transcripts (Profile I)
+- S5 : Analysis of comparison with NEXTDB
+- S6 : expression levels of X linked genes in hermaphrodites
+- S8 : expression levels / transcriptional rates in hermaphrodites
+- S9 : Male transcript counts (gonads 1 and 2)
+- S10 : Male transcript expression levels
+- S11 : transcript to gene name table
+
+```{r importing data, message=FALSE }
+# read in necessary libraries
+library(readxl)
+library(tidyverse)
+library(skimr)
+
+### Importing and cleaning tables S1,S2,S8,S9,S10,S11 ###
+
+# importing S1 - hermaphrodite expression table
+hermExpNad <- read_excel("../data/S1_Table.xlsx", skip = 3)
+colnames(hermExpNad) <- c("ORF", 1:10, 1:10, "WBGene")
+glimpse(hermExpNad)
+
+# S2 Herm exp levels;normalized and averaged
+hermExpNormed <- read_excel("../data/S2_Table.xlsx", skip = 3)
+colnames(hermExpNormed)[1] <- "ORF"
+colnames(hermExpNormed)[17] <- "Gene_Name"
+glimpse(hermExpNormed)
+
+# S8
+hermRates <- read_excel("../data/S8_Table.xlsx", skip = 3)
+colnames(hermRates) <- c("ORF", "Gene_Name", "WormBase_ID", "Chromosome", "Strand", "Ribo_rep1", "Ribo_rep2", "mRNA_rep1", "mRNA_rep2")
+glimpse(hermRates)
+
+# S9
+maleExpNad <- read_excel("../data/S9_Table.xlsx", skip = 3)
+colnames(maleExpNad) <- c("ORF", 1:10, 1:10, "WBGene")
+glimpse(maleExpNad)
+
+# S10
+maleExpNormed <- read_excel("../data/S10_Table.xlsx", skip = 3)
+colnames(maleExpNormed)[1] <- "ORF"; colnames(maleExpNormed)[colnames(maleExpNormed) == "Gene Name"] <- "Gene_Name"
+glimpse(maleExpNormed)
+
+# S11
+txrptGene <- read_excel("../data/S11_Table.xlsx")
+glimpse(txrptGene)
+```
+
+To this point, I have imported and cleaned up most of the data I think we need. Some further steps may need to be taken to process data, but that can be done on an as needed basis.
