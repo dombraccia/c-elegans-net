@@ -1,0 +1,55 @@
+---
+title: "Temporal Co-expression Networks"
+author: "Domenick Braccia"
+date: "3/28/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# overview
+
+```{r}
+library(tidyverse)
+miRNA_bulk <- read.delim("../data/sc-data/index.html?acc=GSE115884&format=file&file=GSE115884_miRNA_bulk.tsv.gz")
+miRNA_slices <- read.delim("../data/sc-data/index.html?acc=GSE115884&format=file&file=GSE115884_miRNA_slices.tsv.gz")
+mRNA_bulk <- read.delim("../data/sc-data/index.html?acc=GSE115884&format=file&file=GSE115884_mRNA_bulk.tsv.gz")
+mRNA_slices <- read.delim("../data/sc-data/index.html?acc=GSE115884&format=file&file=GSE115884_mRNA_slices.tsv.gz")
+glimpse(mRNA_slices)
+glimpse(mRNA_bulk)
+glimpse(miRNA_slices)
+```
+
+# Raw table -> gene expression table
+
+```{r}
+# extracting relevant columns
+mRNA_slices_N2 <- filter(mRNA_slices, genotype == "N2")
+mRNA_slices_N2 <- mRNA_slices_N2[!is.na(mRNA_slices_N2$slice_index),]
+sample_names <- c("N2_mRNA_A1", "N2_mRNA_A2", "N2_mRNA_A3", "N2_mRNA_P1", "N2_mRNA_P2", "N2_mRNA_P3")
+#mRNA_slices_N2$sample_name_num <- as.numeric((mRNA_slices_N2$sample_name))
+n_slices <- 13 # only using the slices with all viable samples
+n_samples <- length(sample_names)
+tmp <- list() # initializing list
+for (i in 1:n_slices) {
+  for (j in 1:n_samples) {
+    k <- 6 * (i - 1) + j
+    tmp[[k]] <- filter(mRNA_slices_N2, slice_index == i, sample_name == sample_names[j])
+  }
+}
+
+#gene_ids <- as.character(unique(mRNA_slices_N2$gene_id))
+gene_exp <- tmp[[1]]
+gene_exp<- gene_exp %>% group_by(gene_id) %>%
+  summarise(gene_cpm = mean(cpm))
+colnames(gene_exp)[2]<-paste("slice", "_", 1,"_", "sample", "_", 1, sep = "")
+
+for (k in 2:78) {
+  gene_exp <- cbind(gene_exp, (tmp[[k]] %>% group_by(gene_id) %>% summarise(gene_cpm = mean(cpm)))[, 2])
+  colnames(gene_exp)[k+1]<- paste("slice", "_", (ceiling(k/6)), "_", "sample", "_", (6*(1+(k/6)-ceiling(k/6))), sep = "")
+}
+
+```
+
