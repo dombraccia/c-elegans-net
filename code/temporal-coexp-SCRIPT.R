@@ -1,27 +1,14 @@
----
-title: "Temporal Co-expression Networks"
-author: "Domenick Braccia"
-date: "3/28/2019"
-output: pdf_document
----
+# coexpression net generation script
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-# overview
-
-```{r}
+# LOADING DATA #
 library(tidyverse)
 miRNA_bulk <- read.delim("../data/spatiotemporal-data/index.html?acc=GSE115884&format=file&file=GSE115884_miRNA_bulk.tsv.gz")
 miRNA_slices <- read.delim("../data/spatiotemporal-data/index.html?acc=GSE115884&format=file&file=GSE115884_miRNA_slices.tsv.gz")
 mRNA_bulk <- read.delim("../data/spatiotemporal-data/index.html?acc=GSE115884&format=file&file=GSE115884_mRNA_bulk.tsv.gz")
 mRNA_slices <- read.delim("../data/spatiotemporal-data/index.html?acc=GSE115884&format=file&file=GSE115884_mRNA_slices.tsv.gz")
-```
+################
 
-# Raw table -> transcript level expression table
-
-```{r}
+# RAW TABLE -> TRANSCRIPT LEVEL EXPRESSION TABLE #
 # extracting relevant columns
 mRNA_slices_N2 <- filter(mRNA_slices, genotype == "N2")
 mRNA_slices_N2 <- mRNA_slices_N2[!is.na(mRNA_slices_N2$slice_index),] # removing rows with NA's for slice index
@@ -62,69 +49,18 @@ gene_exp_nonzero <- gene_exp %>%
   mutate(row_sum_nonzero = rowSums(gene_exp) != 0) %>% 
   filter(row_sum_nonzero == TRUE) %>%
   select(-row_sum_nonzero)
+##################################################
 
-
-#write_tsv(gene_exp, "../data/spatiotemporal-data/gene_exp.tsv") # saving gene exp matrix as tsv for use in tximport
-#######################################
-
-# # staying at transcript level for now... using tximport later
-# tx_exp <- data.frame(TXNAME = tmp[[1]]$transcript_id, sl_1_smpl_1 = tmp[[1]]$cpm)
-# colnames(tx_exp)[2] <- paste("slice", "_", 1,"_", "sample", "_", 1, sep = "")
-# 
-# for (k in 2:78) {
-#   tx_exp <- cbind(tx_exp, tmp[[k]]$cpm)
-#   colnames(tx_exp)[k+1]<- paste("slice", "_", round((ceiling(k/6))), "_", "sample", "_", round((6*(1+(k/6)-ceiling(k/6)))), sep = "")
-# }
-# tx_exp
-# #tx_exp <- tx_exp[-(1:86), ] # removing ERCC spike-in counts
-# write_tsv(tx_exp[,1:2], "../data/spatiotemporal-data/tx_exp.tsv") # saving gene exp matrix as tsv for use in tximport
-```
-
-<!-- # Transcript level quantification -> gene level quantification -->
-
-<!-- ```{r} -->
-<!-- library(tximport) -->
-<!-- library(readr) -->
-<!-- tmp <- read_tsv("../data/spatiotemporal-data/tx_exp.tsv") -->
-<!-- # create tx2gene data.frame -->
-<!-- tx2gene <- mRNA_slices %>%  -->
-<!--   filter(genotype == "N2",  -->
-<!--          slice_index == 1,  -->
-<!--          sample_name == "N2_mRNA_A1") %>%  -->
-<!--   select(transcript_id, gene_id) -->
-<!-- colnames(tx2gene) <- c("TXNAME", "GENEID") -->
-
-<!-- # prepare filenames to be read by tximport() -->
-<!-- file <- "../data/spatiotemporal-data/tx_exp.tsv" -->
-
-<!-- # run tximport() -->
-<!-- txi_tmp <- tximport(files = file, type = "kallisto", tx2gene = tx2gene, txOut = TRUE) -->
-
-<!-- ``` -->
-
-# Co-expression network
-
-```{r}
-library(igraph)
-library(huge)
-
-# prepping
+# PREPPING SLICES LIST BEFORE NETWORK GENERATION #
 slices <- list()
 for (i in 1:13) {
   slices[[i]] <- gene_exp_nonzero[, colnames(gene_exp_nonzero)[(6*(i-1)+1):(6*i)]]
 }
+##################################################
 
-# # running huge to generate initial graph
-amat <- huge(t(slices[[1]]), method = "glasso", lambda = seq(0.5, 0.1, by = -0.2))
-huge.opt <- huge.select(amat, criterion = "ric")
-#summary(huge.opt$refit)
+# GENERATING amat, zmat and pmat AND GRAPH GENERATION #
 
-# bringing huge graph into igraph
-g <- graph_from_adjacency_matrix(huge.opt$refit, mode = "undirected", weighted = NULL, diag = FALSE)
-write_graph(g, "temp-coexp", format = "edgelist")
-```
-
-```{r}
+# making matricies of interest
 amat <- matrix(0, ncol = nrow(slices[[1]]), nrow = nrow(slices[[1]]))
 zmat <- matrix(0, ncol = nrow(slices[[1]]), nrow = nrow(slices[[1]]))
 pmat <- matrix(0, ncol = nrow(slices[[1]]), nrow = nrow(slices[[1]]))
@@ -140,16 +76,8 @@ for (i in 1:nrow(slices[[1]])) {
     pmat[j, i] <- pmat[i, j]
   }
 }
-padjmat_bon <- matrix(p.adjust(pmat, method = "bonferroni", n = length(pmat)), nrow = nrow(slices[[1]]), ncol = nrow(slices[[1]]))
-padjmat_BH <- matrix(p.adjust(pmat, method = "BH", n = length(pmat)), nrow = nrow(slices[[1]]), ncol = nrow(slices[[1]]))
 
-graph_BH <- matrix(as.numeric(padjmat_BH < 0.001), nrow = nrow(slices[[1]]), ncol = nrow(slices[[1]]))
-graph_bon <- matrix(as.numeric(padjmat_bon < 0.001), nrow = nrow(slices[[1]]), ncol = nrow(slices[[1]]))
-sum(graph_BH)/sum(graph_bon)
-sum(graph_BH)/n
-```
-
-```{r}
+#calculating adjusted p-values and making graphs based on p-vals
 n <- length(pmat)
 pcorrmat <- matrix(0, dim(amat)[1], dim(amat)[2])
 for(i in 1:nrow(amat)){ 
@@ -170,8 +98,4 @@ pcorr_graph_BH <- matrix(as.numeric(pcorradjmat_BH < 0.001), nrow = nrow(slices[
 pcorr_graph_bon <- matrix(as.numeric(pcorradjmat_bon < 0.001), nrow = nrow(slices[[1]]), ncol = nrow(slices[[1]]))
 sum(pcorr_graph_BH)/sum(pcorr_graph_bon)
 sum(pcorr_graph_BH)/n
-```
-
-
-
-
+##########################################################
